@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cargador de Facturas</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0f1923; --paper: #f4f0e8; --accent: #1B3A6B; --accent2: #2563A8;
+    --green: #1A7A4A; --red: #C0392B; --muted: #7a7060; --line: #d4cbb8;
+    --card: #fffdf8; --yellow: #FFF9C4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "DM Sans", sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,165,140,0.10) 27px, rgba(180,165,140,0.10) 28px); }
+  header { background: var(--accent); padding: 1.5rem 2.5rem; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-family: "Syne", sans-serif; font-weight: 800; font-size: 1.4rem; color: white; letter-spacing: -0.02em; }
+  header h1 span { color: #7EB8F7; }
+  .badge { font-family: "DM Mono", monospace; font-size: 0.62rem; padding: 4px 10px; border: 1.5px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.7); border-radius: 2px; letter-spacing: 0.1em; text-transform: uppercase; }
+  main { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  .step-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .step-card { flex: 1; min-width: 180px; background: var(--card); border: 1.5px solid var(--line); border-radius: 4px; padding: 1rem 1.2rem; display: flex; align-items: flex-start; gap: 0.8rem; }
+  .step-num { font-family: "Syne", sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--accent2); line-height: 1; flex-shrink: 0; }
+  .step-card h3 { font-family: "Syne", sans-serif; font-size: 0.85rem; font-weight: 700; margin-bottom: 2px; }
+  .step-card p { font-size: 0.78rem; color: var(--muted); font-family: "DM Mono", monospace; }
+  .type-selector { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; }
+  .type-btn { flex: 1; padding: 0.9rem; border: 2px solid var(--line); background: var(--card); border-radius: 4px; cursor: pointer; font-family: "Syne", sans-serif; font-weight: 700; font-size: 0.9rem; color: var(--muted); transition: all 0.15s; text-align: center; }
+  .type-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
+  .type-btn:hover:not(.active) { border-color: var(--accent2); color: var(--accent); }
+  .type-btn .icon { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+  .upload-zone { border: 2px dashed var(--line); border-radius: 4px; padding: 2.5rem 2rem; text-align: center; cursor: pointer; background: var(--card); transition: all 0.2s; position: relative; margin-bottom: 1rem; }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent2); background: #f0f6ff; }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-zone h2 { font-family: "Syne", sans-serif; font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+  .upload-zone p { font-size: 0.78rem; color: var(--muted); font-family: "DM Mono", monospace; }
+  .file-label { margin-top: 0.8rem; font-size: 0.78rem; color: var(--green); font-family: "DM Mono", monospace; }
+  .btn { font-family: "Syne", sans-serif; font-weight: 700; font-size: 0.9rem; padding: 0.8rem 1.8rem; border: none; cursor: pointer; border-radius: 3px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.5rem; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-success { background: var(--green); color: white; }
+  .btn-success:hover:not(:disabled) { background: #155c32; }
+  .btn-success:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); font-size: 0.8rem; padding: 0.6rem 1.2rem; }
+  .btn-ghost:hover { border-color: var(--ink); }
+  .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .status { padding: 0.9rem 1.1rem; border-radius: 3px; font-family: "DM Mono", monospace; font-size: 0.8rem; margin-bottom: 1.2rem; display: flex; align-items: center; gap: 0.6rem; }
+  .status.loading { background: #fff8ed; border: 1px solid #f0c070; color: #7a5010; }
+  .status.success { background: #edf7f0; border: 1px solid #7bc99a; color: #155c32; }
+  .status.error { background: #fdf0ee; border: 1px solid #e8a090; color: #8a2010; }
+  .spinner { width: 13px; height: 13px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+  .invoice-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 1px; background: var(--line); border: 1.5px solid var(--line); border-radius: 4px; overflow: hidden; margin-bottom: 1.2rem; }
+  .meta-cell { background: var(--card); padding: 0.75rem 1rem; }
+  .meta-cell label { font-family: "DM Mono", monospace; font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 2px; }
+  .meta-cell span { font-family: "Syne", sans-serif; font-weight: 600; font-size: 0.88rem; }
+  .table-wrap { border: 1.5px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--card); margin-bottom: 1.2rem; }
+  .table-hdr { padding: 0.8rem 1.1rem; background: var(--accent); display: flex; justify-content: space-between; align-items: center; }
+  .table-hdr h3 { font-family: "Syne", sans-serif; font-weight: 700; font-size: 0.85rem; color: white; }
+  .table-hdr span { font-family: "DM Mono", monospace; font-size: 0.68rem; color: rgba(255,255,255,0.6); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { font-family: "DM Mono", monospace; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 1rem; text-align: left; background: #f2ede3; border-bottom: 1px solid var(--line); }
+  th.num, td.num { text-align: right; }
+  tbody tr { border-bottom: 1px solid var(--line); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #faf6ee; }
+  td { padding: 0.65rem 1rem; font-size: 0.85rem; }
+  td input { font-family: "DM Mono", monospace; font-size: 0.8rem; border: 1px solid transparent; background: transparent; padding: 2px 4px; border-radius: 2px; width: 100%; transition: border 0.1s; color: var(--ink); }
+  td input:focus { outline: none; border-color: var(--accent2); background: white; }
+  .tfoot-row { background: #f2ede3; border-top: 2px solid var(--line); }
+  .tfoot-row td { font-family: "Syne", sans-serif; font-weight: 700; font-size: 0.88rem; }
+  .section-title { font-family: "Syne", sans-serif; font-weight: 800; font-size: 1rem; margin: 1.5rem 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+  .section-title::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .tip { padding: 0.75rem 1rem; border-left: 3px solid var(--accent2); background: #EFF6FF; font-size: 0.78rem; color: #1e3a6e; font-family: "DM Mono", monospace; margin-bottom: 1.2rem; line-height: 1.6; }
+  .success-banner { background: var(--green); color: white; padding: 1.2rem 1.5rem; border-radius: 4px; text-align: center; }
+  .success-banner h3 { font-family: "Syne", sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+  .success-banner p { font-family: "DM Mono", monospace; font-size: 0.78rem; opacity: 0.85; }
+  .alias-badge { font-size: 0.65rem; background: #e8f5e9; color: #1A7A4A; padding: 1px 5px; border-radius: 2px; margin-left: 4px; font-family: "DM Mono", monospace; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CARGADOR DE <span>FACTURAS</span></h1>
+  <div class="badge">Google Sheets conectado</div>
+</header>
+<main>
+  <div class="step-row">
+    <div class="step-card"><div class="step-num">1</div><div><h3>Elegí el tipo</h3><p>Venta o compra</p></div></div>
+    <div class="step-card"><div class="step-num">2</div><div><h3>Subí el PDF</h3><p>La IA extrae los datos</p></div></div>
+    <div class="step-card"><div class="step-num">3</div><div><h3>Revisá</h3><p>Editá si hace falta</p></div></div>
+    <div class="step-card"><div class="step-num">4</div><div><h3>Cargar</h3><p>Va directo a Sheets</p></div></div>
+  </div>
+  <div class="type-selector">
+    <button class="type-btn active" id="btnVenta" onclick="setType('venta')"><span class="icon">📤</span>VENTA</button>
+    <button class="type-btn" id="btnCompra" onclick="setType('compra')"><span class="icon">📥</span>COMPRA</button>
+  </div>
+  <div class="tip" id="tipText">📋 &nbsp;<strong>Venta:</strong> carga en FACTURACIÓN + VENTAS ART.</div>
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".pdf,image/*">
+    <div style="font-size:2.5rem;margin-bottom:0.75rem;">📄</div>
+    <h2>Arrastrá el PDF o hacé clic para seleccionar</h2>
+    <p>PDF · JPG · PNG</p>
+    <div class="file-label hidden" id="fileLabel"></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnAnalyze" disabled>✦ Analizar factura</button>
+    <button class="btn btn-ghost" id="btnClear">Limpiar</button>
+  </div>
+  <div id="statusBar" class="hidden status"></div>
+  <div id="successBanner" class="hidden"></div>
+  <div id="results" class="hidden">
+    <div class="invoice-meta" id="invoiceMeta"></div>
+    <div class="section-title">📋 Datos principales</div>
+    <div class="table-wrap">
+      <div class="table-hdr"><h3 id="mainTableTitle">DATOS</h3><span>editá si hace falta</span></div>
+      <table id="mainTable"></table>
+    </div>
+    <div class="section-title" id="artTitle">📦 Artículos</div>
+    <div class="table-wrap">
+      <div class="table-hdr"><h3>ARTÍCULOS DETECTADOS</h3><span id="artCount"></span></div>
+      <table>
+        <thead><tr><th>Descripción</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">Precio Unit.</th><th class="num">Total</th></tr></thead>
+        <tbody id="artBody"></tbody>
+        <tfoot><tr class="tfoot-row"><td colspan="4" style="text-align:right;padding-right:1rem;">TOTAL</td><td class="num" id="artTotal"></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" id="btnCargar">⬆ Cargar en Google Sheets</button>
+      <button class="btn btn-ghost" id="btnNueva">+ Nueva factura</button>
+    </div>
+  </div>
+</main>
+<script>
+const SHEET_ID = '106tUn5240Ti1fh7_u8L2aw3MWW7oLFr2w-cvKH-xT8U';
+const PROXY_URL = 'https://proxy-facturas.calellofran.workers.dev/';
+const CLIENT_EMAIL = 'facturacion@formal-clarity-490819-d0.iam.gserviceaccount.com';
+const PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLHiGOlbdxRHMU
+FG71k/k+qMnU9UYhRKOHNz4855hkU/ixIf3rdeHXYFH/8meTA9/Hil4kLEBPEojR
+XhlHw4WO/C9ZhIuYN3+mVVIIQH/RJKtB2GBT2xMS18chEA2rMT3+R13c2AvAlTNp
+wFCvqoonJ1NyIw2srqMYWonuqnVV2HpkN7utx2IpwaHXIuj8T789ZhF2jzunSLA/
+lXYqWHyHMahRcgenahln1MJjEgcupGoMwK5jjPk4WZHmEwEyVMZcOj2Cbn2VzDg9
+Aq2NGRxyrJL3VGoPG/8j/klHJIwN5A3cjdXh7SOL/u4gDBUnrS/zqENt/4BHe5AN
+Nz0kwTTHAgMBAAECggEAAxtmYwJ6SGLGKd/4JIyLawB0+et4k6izoa1gJ9lZFOvN
+6ZO+CRyIBF3mUzZ3jCGqiihdMUt1/l+ntSAt3dGpWNsVtFZZNk5fBwHWG+c0rVPU
+xNCVBKNcwtSHKMPQmbZKnvmjf23UnDEMFMmK0m0W6OtqlNvhaStQtl4oLvzvh40d
+syWQvl7y5HA1BH9kwnwootm+QBbFd0EYCbBbu4uvD/EzdzAsnR50LwKoRWW7HtWp
+r2Tn92pV1690GvV+vnAmkM8u0dFTB/08rjbWEwnCfbKAHl+/8Zm5YeXpU9y0s5Mm
+hoLascBNemexlRvSGksrqsmpm/WNnTtqpIjZgQTVXQKBgQDsGBXulOtdGUMDStDz
+6BxPb7Y1rlEcUjQWgmPS3xT5XdwKYRWROSfMm2dyHgOq3ZwW5742+cgMV5nXdBTf
+nhy7wlFYbbqWlbqCPCWM8Dn8lhE/XgMau95ndzJ2d/MYJg9Wq4Js9JWa/WXcOYqU
+Y9pD7Dp47P3MCzW7NoByW7Xb7QKBgQDcPkZYinI7nOsIFn5TFT5COBNsfMccIj+N
+65GL00PeKmqUhNF4BALknsIFkAETxu/uxd04IQqzapGPsc61tK1AXXQItCOpYMhg
++vx2kvRwkSZKT2yNapA00Z7zK6AiwbEx2f86S/REUotImSfx3GWCcpi31Nn6AQVi
+cv9OEyQFAwKBgQCMYHnR5NvY/Cc7MuXw0Ebc+Ig3fNEfbMUpyRd/j0LSTnuB9F21
+fm1qm9AzKyN1GdUwTVRtLbFDnWaMk6nBmCpvfUeOs5eo55gAzbBqD3/67mOM8OIZ
+qDDCBj6L8CArcJ3YI5wmGntFr3s8KT57oq9piXDu68Kv6s5k5TAUTvFftQKBgBNL
+DUSCVEFunJQnzEcg7ERGv0TYpWSMh366LRTPm/lhQ9bgz6ywxUQbuClelQmTer8y
+7A8XreVLp5ar38zBGBA0X47HoPwcc1Ezi1wjwW/+9xi5XmwA8sL9vevVXYDN8OTK
+EPadYrd9d6ATcpFYWjgUK9amubWR01PtePnw6U3bAoGAET6Wr7PsevtGNr77nq/B
+mKWt3Msvr85dX59v8EQykw/lpT3FBWK9WTXFMKrS82xfDJiBusTlMcaiToKa5sNT
+3nL+Oi+3FA/U9b4NBKmt+X67kguOigau71JA/BVMa/okUodfYElFAx7TLkd2pEsN
+ZJcx/Syfhw+QNarje6uF3l0=
+-----END PRIVATE KEY-----`;
+
+const MESES_ES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+const CLIENTES_CONOCIDOS = ["4 COMMERCE", "ALSINA", "ANTOFLO", "ARGEN-POOL", "ARGUL", "ARSAVI", "ARTMET", "BALAIC ARMANDO", "BELLARIA", "BIJ LOPEZ", "BINDO ALEJANDRO", "BIOSINTEX", "BOMPOU", "CALELLO JOSE LUIS", "CAMAÑO", "CAPUTO EZEQUIEL", "CARMOCAL", "CASIRAGHI", "COBELUX", "COLOMBO NESTOR", "CONSORCIO", "CONSTRUCTORA FERCO", "COOPERATIVA 19 DE DICIEMBRE", "CORTES Y SISTEMAS", "COVER PAINTS", "DC PLAST", "DELGADO GASTON", "DRO PUR S.A.", "ECOHABITAT", "EDICIONES COLIHUE", "ELEKTROGEM", "ELEPIN", "ENERSYS", "FABRICANTES ASOCIADOS", "FADAC", "FERROCEMENT", "FISIPA S.A.", "FMA SERVICIOS", "FRIGORIFICO", "GALFIONE", "GESTAM", "GREEN SAIL", "HARLE ROSA", "HOGAR CONSTRUCCIONES", "HUNTER", "I2 INVERSIONES", "INDUSTRIAS BIANCHI", "INTER-RUEDA", "JUAN ANDRES", "KC", "LA FORTEZA", "LAINDELL", "LONGVIE", "LOPEZ", "LUMAR MET", "LUMMA", "MAFISA", "MAGALIA", "MANCUL", "MAQUINARIAS ZEZIOLA", "MASTER CLEAN", "MATALURGICA LA TOMA", "MAXIMIA", "METALURGICA LA TOMA", "MOREL DIOSILDO", "MPM GROUP", "MUÑIZ ALDO NILO", "OFAR", "PASTORINO", "PEIRA S.A.", "PIERPOLA", "PISOS Y REVESTIMIENTOS", "PKG SA", "PRECISIÓN", "PREFECTURA", "PRFECTURA", "PROMO PRESS", "QUIMICA VART", "QUIMICA Y ENERGÍA", "ROBERTO MARTINEZ", "SAFER SACIF", "SAN FRANCISCO QUIM", "SCAPIN HUGO", "SCT PATAGONIA", "SEAN METAL", "SECIN", "SIENA DARIO LUJAN", "SM OBRAS", "SOGESIC", "SPG SUPER AHORRO", "TATANGELLO PABLO", "TATANGELLO PEDRO", "TECNITAL", "TEXTIL LOS ANDES", "TOBAGO", "TRANSENER", "TRANSLOGISTICA", "TROX ARGENTINA", "TUBOFORTE", "UNIFIBERS", "VENTALUM", "VIALMANI", "WERBACH CRISTIAN", "WOOD TOOLS", "WORLDSEG", "ZOLOAGA ALICIA"];
+const PROVEEDORES_CONOCIDOS = ["AG SERVICIOS", "AGROPETROLERA CHAJARI SRL", "AKTUAL", "ALCOVER", "ALCOVER SRL", "ALMIRO", "ALPHA CHEMICAL", "ALSIM SRL", "ARGEN SA", "ARRACHADO", "ARRICHETTA", "AXI MARTIN LUIS", "BAC DALL", "BANDA ALSINA", "BARPLA", "BARTALOMEI GUSTAVO EMILIANO", "BE NICE", "BEEL SUR", "BEELSUR", "BIDCOM", "BIG BLUE", "BM LUBRICANTES", "BOTAS", "BOUZOS JOSE", "BRANCHESI", "BRENDA BARBARA HAINES", "BRENDA HAINES", "BS AS SILVER PLATE", "CABALLITO PISOS", "CALELLO JOSE LUIS", "CAPRAVO S.A.", "CASA BEATO", "CASIMIRO FELIX", "CENTRO SUSPENSION", "CINTAR EMBAJES", "CKL SEGURIDAD INDUSTRIAL", "CLP SRL", "COLLA ARIEL", "COMBUSTIBLES LITORAL", "COMPAÑÍA SEPELIOS CARLOS CALVO", "COOPERATIVA DE TRABAJO CUEROS ALSINA", "COPPEL", "CORRALON PAUTOM", "COWEN SANCHEZ MARIANO", "CRUCERO DEL SUR", "CUEROS ALSINA", "DAMALU", "DEHEZA", "DELBIAN", "DENIM", "DESTINATUM SA", "DI NUZZO DAMIAN", "DIFEL", "DINAMIC STORE", "DISTRI LIMP", "DISTRIBUCION GRAN AZUL", "DISTRIBUIDORA SEGOD", "DISTRIMART COMER", "DON FELIX SA", "DRAP SRL", "DUNTOP", "EL GRECO", "EMBAJES", "EMBALAJES", "EMPRENDIMIENTO PLASTICOS", "EMPRENDIMIENTOS PLASTICOS", "EMPRENDIMIENTOS SATELITALES", "ESCRIBANIA MARCELA GRANDE", "ESPUMAS GADA FLEX", "ESTACION ASAMBLEA", "ESTACION LIMA", "ESTEVEZ JORGE", "ESTOMBAC", "EUROSWISS", "EXPRESO TROLE", "F.S. MATERIALES", "FAGUAR", "FIORE LAVORO", "FLORANS", "FLORES NAHUEL IVAN", "FLUVE", "FRAVEGA", "FULL SOUTH HOME", "FYF LLANTAS CUBIERTAS", "GALEANO HERCULES", "GERARDO JORGE", "GILBERTO HERMANOS", "GLOVE DIP", "GOMCOM SA", "GRANSITIO", "GRUPO MAR CAR", "GUS Y GUS", "HAY STOCK", "HI FLEX", "HI-FLEX", "HIPERPLASTICOS COLOMBRARO", "HOLLSEN HOGAR", "HOSPITAL BRITANICO", "IBPSA", "IDRELCASTY MAT STORE", "IGNACIO JOSE SAUER", "IGNACIO NAVETTA", "IMOLLA", "IMPRETATI", "INDUSTRIAS CARMIX", "JORGUAN", "KAIULANI", "KARAKA", "KATALINA", "KL MEAT", "LIGUX SA", "LOGISTICA CARCASAL", "LUBE", "LUEV", "LUNA GUILLERMO FEDERICO", "LYT", "MACRO BLANCO", "MARASLIOGLU LEANDRO ARIEL", "MARTELLO MATERIALES", "MATERIALES FS", "MATERIALES PLATACOLOR", "MAYORISTA YAGUAR", "MAYORISTA YAHUAR", "MEDIGLOVE", "MENDIZABAL RAUL", "MENNE TELAS", "MERCANTIL ANDINA", "MEXX", "MILTOS MERCEDES MARICEL", "MION DAVID EXEQUIEL", "MIRMITEXE SOLUCIONES", "MIXRAHI ABRAHAM", "MODO BETA STOCK", "MORTATI VICTOR", "MUNDO TEXTIL", "NEUMATICOS UGARTE", "NEW FAMILY", "NEW ROM SANITARIOS", "NEXINA", "NGA SRL", "NUEVE ESTRELLAS SA", "OBRAS Y DESARROLLOS NUÑEZ", "OMBU", "OMETEPLEX", "OPERADORA ESTACIONES DE SERVICIOS", "ORELLANA ULLOA", "OSCAR LESCANO HOTEL", "OTRO MUNDO", "OXIMETAL", "PAN AMERICAN ENERGY", "PERCHALANDIA", "PEREZ HECTOR ARIEL", "PERREN ISMAEL", "PERSONALIZACIONES GROUP SA", "PETROLFE", "PIERPOLA", "PINTURERIA REX", "PINTURERIAS ANI", "PINTURERIAS YANINA", "PINTURERÍAS REX", "PODESTA", "PODESTA BARTOLOME ALBERTO", "PRENITEX", "PRENTEX", "PRODUCTOS PUBLICITARIOS", "PRONOR", "PROYECTOS URBANISTICOS SA", "PUMPAR", "RANDON S.A.", "RAPIESTANTES", "REFRIGERACIONES", "REPUESTOS VAAL", "RINOTEC", "ROCA PLATINO", "ROCCA COMBUSTIBLES", "ROCUANT", "ROGUANT", "RPB DENIM", "RUGINA HECTOR HORACIO", "SALVA PETROL COMBUSTIBLES", "SAN JUAN Y SOLIS", "SANDRAS RAFAEL", "SCARPATTI AXEL RENZO", "SEGAL GABRIEL ALEJANDRO", "SEGOD", "SEGUTECNICA", "SERVICENTRO KAIULANI", "SHELL", "SONY", "SPG SUPER AHORRO", "SPILOTTI HORACIO", "STARTEX", "SUPER SERVICIOS SA", "SUPLEMENTOS E INSUMOS", "SUR CORRENTINO SRL", "TAPI", "TAPSA", "TELASINC", "TELECOM", "TEXTIL BAND", "TEXTIL BAND BSAS SRL", "TEXTIL FRANCIOSA", "THE CHILLING COMPANY", "TIO MUSA", "TRANSFORMADORA AMERICANA", "TRANSFORMADORA PLASTICOS", "TRUMINI ANTONIO", "UNPAR", "URREA CESARANO", "VENEX", "VIA CARGO", "VTV", "WABRIT", "WORLDSEG", "YAN WENJING", "YPF", "YPF RUTA 14"];
+
+// Normalize name for matching
+function normalizeName(s) {
+  return s.toUpperCase().trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[.\-_,;/]+/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+
+// Find best alias match
+function findAlias(name, knownList) {
+  const norm = normalizeName(name);
+  // Exact match first
+  for (const k of knownList) {
+    if (normalizeName(k) === norm) return k;
+  }
+  // Fuzzy match
+  let best = null, bestScore = 0;
+  for (const k of knownList) {
+    const kn = normalizeName(k);
+    const score = strSimilarity(norm, kn);
+    if (score > bestScore) { bestScore = score; best = k; }
+  }
+  return bestScore >= 0.80 ? best : name.toUpperCase().trim();
+}
+
+function strSimilarity(a, b) {
+  if (a === b) return 1;
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  if (longer.length === 0) return 1;
+  const dist = editDistance(longer, shorter);
+  return (longer.length - dist) / longer.length;
+}
+
+function editDistance(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_,i) => Array.from({length: n+1}, (_,j) => i===0?j:j===0?i:0));
+  for (let i=1;i<=m;i++) for (let j=1;j<=n;j++)
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+// Format mes correctly: "MARZO 2026"
+function formatMes(mesRaw, fechaStr) {
+  if (!mesRaw && !fechaStr) return '';
+  // Try to extract from fecha
+  if (fechaStr) {
+    const parts = fechaStr.split('/');
+    if (parts.length === 3) {
+      const m = parseInt(parts[1]);
+      const y = parseInt(parts[2]);
+      if (m>=1 && m<=12 && y>2000) return MESES_ES[m-1] + ' ' + y;
+    }
+  }
+  // Try to parse raw mes
+  if (mesRaw) {
+    const upper = mesRaw.toUpperCase().trim();
+    // Already has year?
+    const yearMatch = upper.match(/(\d{4})/);
+    const year = yearMatch ? yearMatch[1] : new Date().getFullYear();
+    for (const mes of MESES_ES) {
+      if (upper.includes(mes)) return mes + ' ' + year;
+    }
+  }
+  return (mesRaw || '').toUpperCase().trim();
+}
+
+// Parse number safely
+function parseNum(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return val;
+  const clean = String(val).replace(/[^0-9.,\-]/g,'').replace(',','.');
+  return parseFloat(clean) || 0;
+}
+
+let invoiceType = 'venta';
+let selectedFile = null;
+let extractedData = null;
+
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const fileLabel = document.getElementById('fileLabel');
+const btnAnalyze = document.getElementById('btnAnalyze');
+const btnClear = document.getElementById('btnClear');
+const btnCargar = document.getElementById('btnCargar');
+const btnNueva = document.getElementById('btnNueva');
+const statusBar = document.getElementById('statusBar');
+const results = document.getElementById('results');
+const successBanner = document.getElementById('successBanner');
+
+function setType(t) {
+  invoiceType = t;
+  document.getElementById('btnVenta').classList.toggle('active', t==='venta');
+  document.getElementById('btnCompra').classList.toggle('active', t==='compra');
+  const tip = document.getElementById('tipText');
+  tip.innerHTML = t==='venta'
+    ? '📋 &nbsp;<strong>Venta:</strong> carga en FACTURACIÓN + VENTAS ART.'
+    : '📋 &nbsp;<strong>Compra:</strong> carga en COMPRAS + COMPRAS ART.';
+}
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  fileLabel.textContent = '✓  ' + f.name + '  (' + (f.size/1024).toFixed(0) + ' KB)';
+  fileLabel.classList.remove('hidden');
+  btnAnalyze.disabled = false;
+}
+
+btnClear.addEventListener('click', reset);
+btnNueva.addEventListener('click', reset);
+
+function reset() {
+  selectedFile = null; extractedData = null;
+  fileInput.value = ''; fileLabel.classList.add('hidden'); fileLabel.textContent = '';
+  btnAnalyze.disabled = true;
+  hide(statusBar); hide(results); hide(successBanner);
+}
+
+btnAnalyze.addEventListener('click', analyzeInvoice);
+
+async function analyzeInvoice() {
+  if (!selectedFile) return;
+  btnAnalyze.disabled = true;
+  showStatus('loading', 'Leyendo la factura con IA...');
+  hide(results); hide(successBanner);
+  try {
+    const base64 = await toBase64(selectedFile);
+    const isPDF = selectedFile.type === 'application/pdf' || selectedFile.name.toLowerCase().endsWith('.pdf');
+    const mediaType = isPDF ? 'application/pdf' : (selectedFile.type || 'image/jpeg');
+    const isVenta = invoiceType === 'venta';
+    const prompt = isVenta
+      ? `Analizá esta factura de VENTA argentina. Respondé SOLO con JSON válido sin texto extra ni markdown.
+{"tipo":"venta","fecha":"DD/MM/YYYY","cliente":"nombre exacto del cliente","nro_factura":"número","nro_remito":"número o vacío","monto_neto":número,"monto_total":número,"iva":número,"iibb_caba":número,"iibb_bs_as":número,"ganancias":número,"retencion_iva":número,"mes_retencion":"","empresa":"","items":[{"descripcion":"","unidad":"","cantidad":número,"precio_unitario":número,"total":número}]}
+IMPORTANTE: todos los montos deben ser números sin símbolos ni puntos de miles. Si no encontrás un valor usá 0.`
+      : `Analizá esta factura de COMPRA argentina. Respondé SOLO con JSON válido sin texto extra ni markdown.
+{"tipo":"compra","fecha":"DD/MM/YYYY","proveedor":"nombre exacto del proveedor","nro_factura":"número","monto_total":número,"iva":número,"iibb_caba":número,"iibb_bs_as":número,"percepciones_iva":número,"empresa":"","items":[{"descripcion":"","unidad":"","cantidad":número,"precio_unitario":número,"total":número}]}
+IMPORTANTE: todos los montos deben ser números sin símbolos ni puntos de miles. Si no encontrás un valor usá 0.`;
+
+    const contentBlock = isPDF
+      ? {type:'document',source:{type:'base64',media_type:mediaType,data:base64}}
+      : {type:'image',source:{type:'base64',media_type:mediaType,data:base64}};
+
+    const resp = await fetch(PROXY_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[contentBlock,{type:'text',text:prompt}]}]})
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error?.message || 'Error API');
+    const text = data.content.map(b=>b.text||'').join('');
+    const clean = text.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+
+    // Normalize and apply aliases
+    if (isVenta) {
+      parsed.cliente = findAlias(parsed.cliente || '', CLIENTES_CONOCIDOS);
+      parsed.monto_neto = parseNum(parsed.monto_neto);
+      parsed.monto_total = parseNum(parsed.monto_total);
+      parsed.iva = parseNum(parsed.iva);
+      parsed.iibb_caba = parseNum(parsed.iibb_caba);
+      parsed.iibb_bs_as = parseNum(parsed.iibb_bs_as);
+      parsed.ganancias = parseNum(parsed.ganancias);
+      parsed.retencion_iva = parseNum(parsed.retencion_iva);
+    } else {
+      parsed.proveedor = findAlias(parsed.proveedor || '', PROVEEDORES_CONOCIDOS);
+      parsed.monto_total = parseNum(parsed.monto_total);
+      parsed.iva = parseNum(parsed.iva);
+      parsed.iibb_caba = parseNum(parsed.iibb_caba);
+      parsed.iibb_bs_as = parseNum(parsed.iibb_bs_as);
+      parsed.percepciones_iva = parseNum(parsed.percepciones_iva);
+    }
+    // Format mes from fecha
+    parsed.mes = formatMes(parsed.mes || '', parsed.fecha || '');
+    if (parsed.mes_retencion) parsed.mes_retencion = formatMes(parsed.mes_retencion, '');
+    // Normalize items
+    if (parsed.items) parsed.items = parsed.items.map(it => ({
+      ...it,
+      cantidad: parseNum(it.cantidad),
+      precio_unitario: parseNum(it.precio_unitario),
+      total: parseNum(it.total) || parseNum(it.cantidad)*parseNum(it.precio_unitario)
+    }));
+
+    extractedData = parsed;
+    renderResults(parsed);
+    showStatus('success', '✓  Datos extraídos. Revisá y cargá en Google Sheets.');
+  } catch(err) {
+    showStatus('error', 'Error: ' + err.message);
+  }
+  btnAnalyze.disabled = false;
+}
+
+function renderResults(d) {
+  const isVenta = d.tipo === 'venta';
+  // Meta
+  const metaFields = isVenta
+    ? [['Fecha',d.fecha||'—'],['Cliente',d.cliente||'—'],['Nro FC',d.nro_factura||'—'],['Monto Total','$ '+(d.monto_total||0).toLocaleString('es-AR',{minimumFractionDigits:2})]]
+    : [['Fecha',d.fecha||'—'],['Proveedor',d.proveedor||'—'],['Nro FC',d.nro_factura||'—'],['Monto Total','$ '+(d.monto_total||0).toLocaleString('es-AR',{minimumFractionDigits:2})]];
+  document.getElementById('invoiceMeta').innerHTML = metaFields.map(([l,v])=>
+    '<div class="meta-cell"><label>'+l+'</label><span>'+v+'</span></div>').join('');
+
+  document.getElementById('mainTableTitle').textContent = isVenta ? 'DATOS DE FACTURACIÓN' : 'DATOS DE COMPRA';
+  const mt = document.getElementById('mainTable');
+  const numFmt = n => (parseFloat(n)||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  function frow(label, val, field) {
+    return '<tr><td style="font-weight:500;width:200px">'+label+'</td><td class="num"><input type="text" value="'+esc(val)+'" data-field="'+field+'" style="width:100%;text-align:right"></td></tr>';
+  }
+  if (isVenta) {
+    mt.innerHTML = '<thead><tr><th>Campo</th><th class="num">Valor</th></tr></thead><tbody>'
+      + frow('Mes', d.mes||'', 'mes')
+      + frow('Cliente', d.cliente||'', 'cliente')
+      + frow('Nro Factura', d.nro_factura||'', 'nro_factura')
+      + frow('Nro Remito', d.nro_remito||'', 'nro_remito')
+      + frow('Monto Neto', numFmt(d.monto_neto), 'monto_neto')
+      + frow('Monto Total', numFmt(d.monto_total), 'monto_total')
+      + frow('IVA', numFmt(d.iva), 'iva')
+      + frow('IIBB CABA', numFmt(d.iibb_caba), 'iibb_caba')
+      + frow('IIBB Bs As', numFmt(d.iibb_bs_as), 'iibb_bs_as')
+      + frow('Ganancias', numFmt(d.ganancias), 'ganancias')
+      + frow('Retención IVA', numFmt(d.retencion_iva), 'retencion_iva')
+      + frow('Mes Retención', d.mes_retencion||'', 'mes_retencion')
+      + frow('Empresa (vacío=Calello)', d.empresa||'', 'empresa')
+      + '</tbody>';
+  } else {
+    mt.innerHTML = '<thead><tr><th>Campo</th><th class="num">Valor</th></tr></thead><tbody>'
+      + frow('Mes', d.mes||'', 'mes')
+      + frow('Proveedor', d.proveedor||'', 'proveedor')
+      + frow('Nro Factura', d.nro_factura||'', 'nro_factura')
+      + frow('Monto Total', numFmt(d.monto_total), 'monto_total')
+      + frow('IVA', numFmt(d.iva), 'iva')
+      + frow('IIBB CABA', numFmt(d.iibb_caba), 'iibb_caba')
+      + frow('IIBB Bs As', numFmt(d.iibb_bs_as), 'iibb_bs_as')
+      + frow('Percepciones IVA', numFmt(d.percepciones_iva), 'percepciones_iva')
+      + frow('Empresa (vacío=Calello)', d.empresa||'', 'empresa')
+      + '</tbody>';
+  }
+
+  document.getElementById('artTitle').textContent = isVenta ? '📦 Artículos vendidos' : '📦 Artículos comprados';
+  const items = d.items || [];
+  document.getElementById('artCount').textContent = items.length + ' artículo' + (items.length!==1?'s':'');
+  const artBody = document.getElementById('artBody');
+  artBody.innerHTML = items.map((it,i)=>
+    '<tr data-idx="'+i+'">'
+    +'<td><input type="text" value="'+esc(it.descripcion)+'" data-field="descripcion" data-idx="'+i+'" style="width:100%;min-width:180px;text-align:left"></td>'
+    +'<td><input type="text" value="'+esc(it.unidad)+'" data-field="unidad" data-idx="'+i+'" style="width:60px;text-align:center"></td>'
+    +'<td class="num"><input type="number" value="'+it.cantidad+'" data-field="cantidad" data-idx="'+i+'" style="width:70px"></td>'
+    +'<td class="num"><input type="number" value="'+it.precio_unitario+'" data-field="precio_unitario" data-idx="'+i+'" style="width:100px"></td>'
+    +'<td class="num" id="tot_'+i+'">$ '+it.total.toLocaleString("es-AR",{minimumFractionDigits:2})+'</td>'
+    +'</tr>').join('');
+
+  artBody.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const idx = +inp.dataset.idx;
+      const field = inp.dataset.field;
+      extractedData.items[idx][field] = inp.type==='number' ? parseFloat(inp.value)||0 : inp.value;
+      if (field==='cantidad'||field==='precio_unitario') {
+        const it = extractedData.items[idx];
+        it.total = it.cantidad * it.precio_unitario;
+        document.getElementById('tot_'+idx).textContent = '$ '+it.total.toLocaleString('es-AR',{minimumFractionDigits:2});
+      }
+    });
+  });
+
+  const total = items.reduce((s,it)=>s+(it.total||0),0);
+  document.getElementById('artTotal').textContent = '$ '+total.toLocaleString('es-AR',{minimumFractionDigits:2});
+  show(results);
+}
+
+async function getAccessToken() {
+  const now = Math.floor(Date.now()/1000);
+  const enc = s => btoa(JSON.stringify(s)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const header = enc({alg:'RS256',typ:'JWT'});
+  const payload = enc({iss:CLIENT_EMAIL,scope:'https://www.googleapis.com/auth/spreadsheets',aud:'https://oauth2.googleapis.com/token',exp:now+3600,iat:now});
+  const sigInput = header+'.'+payload;
+  const pem = PRIVATE_KEY.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g,'');
+  const der = Uint8Array.from(atob(pem),c=>c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8',der.buffer,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(sigInput));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const jwt = sigInput+'.'+sigB64;
+  const r = await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion='+jwt});
+  const td = await r.json();
+  if (!td.access_token) throw new Error('No se pudo obtener token');
+  return td.access_token;
+}
+
+async function appendToSheet(sheetName, values, token) {
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(sheetName)+':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
+  const r = await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({values})});
+  if (!r.ok) { const e=await r.json(); throw new Error(e.error?.message||'Error Sheets'); }
+  return r.json();
+}
+
+btnCargar.addEventListener('click', async () => {
+  if (!extractedData) return;
+  btnCargar.disabled = true;
+  showStatus('loading', 'Conectando con Google Sheets...');
+  try {
+    // Read current values from DOM inputs
+    document.querySelectorAll('#mainTable input[data-field]').forEach(inp => {
+      const field = inp.dataset.field;
+      const numFields = ['monto_neto','monto_total','iva','iibb_caba','iibb_bs_as','ganancias','retencion_iva','percepciones_iva'];
+      if (numFields.includes(field)) {
+        extractedData[field] = parseFloat(inp.value.replace(/[.]/g,'').replace(',','.')) || 0;
+      } else {
+        extractedData[field] = inp.value;
+      }
+    });
+
+    const token = await getAccessToken();
+    showStatus('loading', 'Cargando en la planilla...');
+    const d = extractedData;
+    const isVenta = d.tipo === 'venta';
+
+    if (isVenta) {
+      const facRow = [[
+        d.mes||'', d.fecha||'', d.cliente||'', '', d.empresa||'',
+        d.nro_factura||'', d.nro_remito||'',
+        d.monto_neto||0, d.monto_total||0, d.iva||0,
+        d.iibb_caba||0, d.iibb_bs_as||0, d.ganancias||0,
+        d.retencion_iva||0, d.mes_retencion||'', ''
+      ]];
+      await appendToSheet('FACTURACIÓN', facRow, token);
+      if (d.items && d.items.length > 0) {
+        const artRows = d.items.map(it => [d.fecha||'', d.cliente||'', d.nro_factura||'', it.descripcion||'', it.cantidad||0, it.precio_unitario||0]);
+        await appendToSheet('VENTAS ART', artRows, token);
+      }
+    } else {
+      const compRow = [[
+        d.mes||'', d.fecha||'', d.empresa||'', d.nro_factura||'', d.proveedor||'',
+        d.monto_total||0, d.iva||0, d.iibb_caba||0, d.iibb_bs_as||0, d.percepciones_iva||0
+      ]];
+      await appendToSheet('COMPRAS', compRow, token);
+      if (d.items && d.items.length > 0) {
+        const artRows = d.items.map(it => [d.fecha||'', d.proveedor||'', d.nro_factura||'', it.descripcion||'', it.cantidad||0, it.precio_unitario||0]);
+        await appendToSheet(' COMPRAS ART', artRows, token);
+      }
+    }
+
+    hide(statusBar); show(successBanner);
+    const n = d.items?.length||0;
+    successBanner.innerHTML = '<div class="success-banner"><h3>✅ Cargado en Google Sheets</h3><p>→ '+(isVenta?'FACTURACIÓN':'COMPRAS')+': 1 fila &nbsp;|&nbsp; → '+(isVenta?'VENTAS ART':'COMPRAS ART')+': '+n+' artículo'+(n!==1?'s':'')+'</p></div>';
+    hide(results);
+  } catch(err) {
+    showStatus('error', 'Error al cargar: '+err.message);
+    btnCargar.disabled = false;
+  }
+});
+
+function toBase64(file) {
+  return new Promise((res,rej) => { const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=()=>rej(new Error('Error leyendo')); r.readAsDataURL(file); });
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function showStatus(type, msg) {
+  statusBar.className='status '+type;
+  statusBar.innerHTML = type==='loading' ? '<div class="spinner"></div><span>'+msg+'</span>' : '<span>'+msg+'</span>';
+  show(statusBar);
+}
+function show(el) { el.classList.remove('hidden'); }
+function hide(el) { el.classList.add('hidden'); }
+</script>
+</body>
+</html>
